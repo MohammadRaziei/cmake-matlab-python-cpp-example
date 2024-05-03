@@ -38,7 +38,7 @@ message(STATUS "FOUND python at ${PYTHON_EXEC}")
 if(DEFINED SKBUILD)
     set(PYTHON_PROJECT_NAME "${SKBUILD_PROJECT_NAME}")
 elseif(BUILD_PYTHON)
-    set(PYTHON_PROJECT_NAME "${CMAKE_CURRENT_BINARY_DIR}/${PROJECT_NAME}/")
+    set(PYTHON_PROJECT_NAME "${CMAKE_BINARY_DIR}")
     
     execute_process(
         COMMAND "${PYTHON_EXEC}" -m nanobind --cmake_dir
@@ -85,10 +85,15 @@ if(DEFINED PYTHON_PROJECT_NAME)
     target_compile_definitions(_core PRIVATE VERSION_INFO=${PROJECT_VERSION})
 
 
+    if(DEFINED SKBUILD)
     install(TARGETS _core
             CONFIGURATIONS Release
             LIBRARY DESTINATION
             ${PYTHON_PROJECT_NAME})
+    else()
+    file(COPY ${PROJECT_SOURCE_DIR}/src/${PROJECT_NAME} DESTINATION ${PYTHON_PROJECT_NAME})
+    set_target_properties(_core PROPERTIES LIBRARY_OUTPUT_DIRECTORY ${PYTHON_PROJECT_NAME}/${PROJECT_NAME})
+    endif()
 endif()
 
 if(DEFINED SKBUILD)
@@ -127,6 +132,17 @@ target_include_directories(test_${PROJECT_NAME} PRIVATE ${PROJECT_SOURCE_DIR}/te
 add_test(NAME cppTests COMMAND test_${PROJECT_NAME})
 
 
+
+if(BUILD_PYTHON)
+add_test(NAME pythonTests
+    COMMAND ${PYTHON_EXEC} -m pytest ${PROJECT_SOURCE_DIR}/tests/python
+    WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+)
+endif()
+
+
+
+
 if(BUILD_MEX)
 find_package(Matlab COMPONENTS MAIN_PROGRAM ENG_LIBRARY MAT_LIBRARY MX_LIBRARY MEX_COMPILER)
 
@@ -145,7 +161,7 @@ set_target_properties(${PROJECT_NAME}Mex PROPERTIES OUTPUT_NAME ${PROJECT_NAME})
 
 add_test(NAME MexTests
 COMMAND ${Matlab_MAIN_PROGRAM} -sd ${PROJECT_SOURCE_DIR}
-  -batch "buildtool test('${CMAKE_CURRENT_SOURCE_DIR}/tests/matlab', 'TestMex/test_arrayProduct', '$<TARGET_FILE_DIR:arrayProductMex>')"
+  -batch "buildtool test('${PROJECT_SOURCE_DIR}/tests/matlab', 'TestMex/test_arrayProduct', '$<TARGET_FILE_DIR:arrayProductMex>')"
 )
 endif()
 endif()
