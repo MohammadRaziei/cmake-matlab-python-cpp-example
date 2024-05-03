@@ -156,10 +156,12 @@ endif()
 matlab_add_mex(NAME ${PROJECT_NAME}Mex SHARED SRC 
     ${PROJECT_SOURCE_DIR}/src/mex/mex_arrayProduct.cpp
 )
+target_sources(${PROJECT_NAME}Mex PRIVATE ${SOURCES})
 set_target_properties(${PROJECT_NAME}Mex PROPERTIES OUTPUT_NAME ${PROJECT_NAME})
+target_include_directories(${PROJECT_NAME}Mex PRIVATE include src)
 
 
-add_test(NAME MexTests
+add_test(NAME mexTests
 COMMAND ${Matlab_MAIN_PROGRAM} -sd ${PROJECT_SOURCE_DIR}
   -batch "buildtool test('${PROJECT_SOURCE_DIR}/tests/matlab', 'TestMex/test_arrayProduct', '$<TARGET_FILE_DIR:arrayProductMex>')"
 )

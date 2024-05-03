@@ -16,26 +16,29 @@
 #include "mex.hpp"
 #include "mexAdapter.hpp"
 
+#include "arrayProduct.h"
+
 class MexFunction : public matlab::mex::Function {
+private:
+    std::shared_ptr<matlab::engine::MATLABEngine> matlabPtr = getEngine();
+    matlab::data::ArrayFactory factory;
 public:
     void operator()(matlab::mex::ArgumentList outputs, matlab::mex::ArgumentList inputs) {
         checkArguments(outputs, inputs);
         double multiplier = inputs[0][0];
         matlab::data::TypedArray<double> in = std::move(inputs[1]);
-        arrayProduct(in, multiplier);
+        arrayProductFunc(in, multiplier);
         outputs[0] = std::move(in);
     }
 
-    void arrayProduct(matlab::data::TypedArray<double>& inMatrix, double multiplier) {
-        
-        for (auto& elem : inMatrix) {
-            elem *= multiplier;
-        }
+    void arrayProductFunc(matlab::data::TypedArray<double>& inMatrix, double multiplier) {
+        size_t size = inMatrix.end() - inMatrix.begin();
+        double* data = inMatrix.begin().operator->();
+        arrayProduct(data, size, multiplier);
     }
 
     void checkArguments(matlab::mex::ArgumentList outputs, matlab::mex::ArgumentList inputs) {
-        std::shared_ptr<matlab::engine::MATLABEngine> matlabPtr = getEngine();
-        matlab::data::ArrayFactory factory;
+
 
         if (inputs.size() != 2) {
             matlabPtr->feval(u"error", 
