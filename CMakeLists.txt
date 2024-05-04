@@ -1,8 +1,12 @@
 cmake_minimum_required(VERSION 3.16)
 
+option(BUILD_PYTHON "export python module" on)
+option(BUILD_MEX "export matlab mex file" on)
+
+
+
 set(CMAKE_CXX_STANDARD 17 CACHE STRING "C++ version selection")
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
-
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 
@@ -26,23 +30,33 @@ message(STATUS "Project: ${PROJECT_NAME}@v${PROJECT_VERSION}")
 # Download the public suffix list file from the internet if not already exists
 
 file(GLOB SOURCES ${PROJECT_SOURCE_DIR}/src/*.cpp)
-message(STATUS ${SOURCES})
 
-option(BUILD_PYTHON "export python module" on)
-option(BUILD_MEX "export matlab mex file" on)
 
-find_program(PYTHON_EXEC NAMES python python3)
-message(STATUS "FOUND python at ${PYTHON_EXEC}")
+# Try to import all Python components potentially needed by nanobind
+
+
 
 
 if(DEFINED SKBUILD)
     set(PYTHON_PROJECT_NAME "${SKBUILD_PROJECT_NAME}")
 elseif(BUILD_PYTHON)
     set(PYTHON_PROJECT_NAME "${CMAKE_BINARY_DIR}")
-    
+
+    find_package(Python3 REQUIRED COMPONENTS Interpreter)
+
+    if(NOT PYTHON_REQUIREMENT_INSTALLED)
+        execute_process(
+                COMMAND "${Python3_EXECUTABLE}" -m pip install
+                nanobind ninja pytest # build requirements
+                OUTPUT_QUIET
+        )
+        set(PYTHON_REQUIREMENT_INSTALLED TRUE CACHE INTERNAL "Python requirements installed")
+    endif()
+
     execute_process(
-        COMMAND "${PYTHON_EXEC}" -m nanobind --cmake_dir
+        COMMAND "${Python3_EXECUTABLE}" -m nanobind --cmake_dir
         OUTPUT_STRIP_TRAILING_WHITESPACE OUTPUT_VARIABLE NB_DIR)
+
     message(STATUS "Found NanoBind at ${NB_DIR}")
     list(APPEND CMAKE_PREFIX_PATH "${NB_DIR}")
 endif()
@@ -52,9 +66,10 @@ endif()
 
 if(DEFINED PYTHON_PROJECT_NAME)
     # Try to import all Python components potentially needed by nanobind
+    #set(Python3_FIND_STRATEGY LOCATION)
     find_package(Python 3.8
-        REQUIRED COMPONENTS Interpreter Development.Module
-        OPTIONAL_COMPONENTS Development.SABIModule)
+            REQUIRED COMPONENTS Interpreter Development.Module
+            OPTIONAL_COMPONENTS Development.SABIModule)
     # Import nanobind through CMake's find_package mechanism
     find_package(nanobind CONFIG REQUIRED)
 
@@ -100,10 +115,10 @@ if(DEFINED SKBUILD)
     RETURN()
 endif()
 
-add_library(${PROJECT_NAME} SHARED ${SOURCES})
+add_library(c${PROJECT_NAME} SHARED ${SOURCES})
 
 
-target_include_directories(${PROJECT_NAME}
+target_include_directories(c${PROJECT_NAME}
         PUBLIC
             ${PROJECT_SOURCE_DIR}/include
         PRIVATE
@@ -113,7 +128,7 @@ target_include_directories(${PROJECT_NAME}
 # add_executable(example examples/main.cpp)
 # target_link_libraries(example PRIVATE )
 
-install(TARGETS ${PROJECT_NAME}
+install(TARGETS c${PROJECT_NAME}
     LIBRARY DESTINATION lib
     ARCHIVE DESTINATION lib
     INCLUDES DESTINATION include
@@ -126,7 +141,7 @@ add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/third_party/googletest)
 file(GLOB TEST_SOURCES ${PROJECT_SOURCE_DIR}/tests/cpp/*.cpp)
 
 add_executable(test_${PROJECT_NAME} ${TEST_SOURCES})
-target_link_libraries(test_${PROJECT_NAME} PRIVATE ${PROJECT_NAME} gtest gtest_main pthread)
+target_link_libraries(test_${PROJECT_NAME} PRIVATE c${PROJECT_NAME} gtest gtest_main pthread)
 target_include_directories(test_${PROJECT_NAME} PRIVATE ${PROJECT_SOURCE_DIR}/tests/cpp)
 
 add_test(NAME cppTests COMMAND test_${PROJECT_NAME})
@@ -135,7 +150,7 @@ add_test(NAME cppTests COMMAND test_${PROJECT_NAME})
 
 if(BUILD_PYTHON)
 add_test(NAME pythonTests
-    COMMAND ${PYTHON_EXEC} -m pytest ${PROJECT_SOURCE_DIR}/tests/python
+    COMMAND ${Python3_EXECUTABLE} -m pytest ${PROJECT_SOURCE_DIR}/tests/python
     WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
 )
 endif()
@@ -153,7 +168,7 @@ if(Matlab_VERSION_STRING VERSION_LESS 9.14)
   message(WARNING "Matlab >= 9.14 (R2023a) is required for MEX tests to work due to new buildtool argument syntax.")
 endif()
 
-matlab_add_mex(NAME ${PROJECT_NAME}Mex SHARED SRC 
+matlab_add_mex(NAME ${PROJECT_NAME}Mex SHARED SRC
     ${PROJECT_SOURCE_DIR}/src/mex/mex_arrayProduct.cpp
 )
 target_sources(${PROJECT_NAME}Mex PRIVATE ${SOURCES})
