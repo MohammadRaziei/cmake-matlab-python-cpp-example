@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
-option(BUILD_PYTHON "export python module" on)
-option(BUILD_MEX "export matlab mex file" on)
+option(BUILD_PYTHON "export python module" off)
+option(BUILD_MEX "export matlab mex file" off)
 
 
 
@@ -178,7 +178,7 @@ target_include_directories(${PROJECT_NAME}Mex PRIVATE include src)
 
 add_test(NAME mexTests
 COMMAND ${Matlab_MAIN_PROGRAM} -sd ${PROJECT_SOURCE_DIR}
-  -batch "buildtool test('${PROJECT_SOURCE_DIR}/tests/matlab', 'TestMex/test_arrayProduct', '$<TARGET_FILE_DIR:arrayProductMex>')"
+  -batch "buildtool test('${PROJECT_SOURCE_DIR}/tests/matlab', 'TestMex/test_arrayProduct', '$<TARGET_FILE_DIR:${PROJECT_NAME}Mex>')"
 )
 endif()
 endif()
