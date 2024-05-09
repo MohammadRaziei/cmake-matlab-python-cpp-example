@@ -10,7 +10,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_CXX_EXTENSIONS OFF)
 
 
-list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake/modules")
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_LIST_DIR}/cmake")
 include(PyProject)
 
 
@@ -34,6 +34,7 @@ file(GLOB SOURCES ${PROJECT_SOURCE_DIR}/src/*.cpp)
 
 # Try to import all Python components potentially needed by nanobind
 
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
 
 
@@ -41,8 +42,6 @@ if(DEFINED SKBUILD)
     set(PYTHON_PROJECT_NAME "${SKBUILD_PROJECT_NAME}")
 elseif(BUILD_PYTHON)
     set(PYTHON_PROJECT_NAME "${CMAKE_BINARY_DIR}")
-
-    find_package(Python3 REQUIRED COMPONENTS Interpreter)
 
     if(NOT PYTHON_REQUIREMENT_INSTALLED)
         execute_process(
@@ -170,10 +169,27 @@ endif()
 
 matlab_add_mex(NAME ${PROJECT_NAME}Mex SHARED SRC
     ${PROJECT_SOURCE_DIR}/src/mex/mex_arrayProduct.cpp
+    OUTPUT_NAME ${PROJECT_NAME}
 )
 target_sources(${PROJECT_NAME}Mex PRIVATE ${SOURCES})
-set_target_properties(${PROJECT_NAME}Mex PROPERTIES OUTPUT_NAME ${PROJECT_NAME})
+# set_target_properties(${PROJECT_NAME}Mex PROPERTIES OUTPUT_NAME ${PROJECT_NAME})
 target_include_directories(${PROJECT_NAME}Mex PRIVATE include src)
+
+
+get_target_property(MEX_INCLUDES ${PROJECT_NAME}Mex INCLUDE_DIRECTORIES)
+get_target_property(MEX_SOURCES ${PROJECT_NAME}Mex SOURCES)
+get_target_property(MEX_OUTPUT_NAME ${PROJECT_NAME}Mex OUTPUT_NAME)
+execute_process(
+    COMMAND "${Python3_EXECUTABLE}" ${CMAKE_CURRENT_SOURCE_DIR}/cmake/utils/create_mex_file.py 
+    ${MEX_OUTPUT_NAME}
+    "${CMAKE_CURRENT_SOURCE_DIR}" "${MEX_INCLUDES}" "${MEX_SOURCES}"
+    OUTPUT_FILE ${PROJECT_SOURCE_DIR}/tools/generated/build.m
+    OUTPUT_STRIP_TRAILING_WHITESPACE
+)
+
+# Construct the compiler string for the include directories.
+# message(${INCLUDE_MEX_STRING})
+
 
 
 add_test(NAME mexTests
